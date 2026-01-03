@@ -3,19 +3,19 @@ from flask_cors import CORS
 from db import connect_db
 import socket
 
-# 🔮 ML Imports
+# 🤖 ML imports
 from ml.ml_engine import crop_predict, fertilizer_predict, yield_predict
 
 app = Flask(__name__)
 CORS(app)
 
-# 🏡 Root
-@app.get("/")
+# 🏡 ROOT ROUTE
+@app.route("/", methods=["GET"])
 def home():
     return {"message": "Crop Advisor API Running 🚜"}
 
-# 🧪 Manual Test Save into DB
-@app.get("/testsave")
+# 🧪 TEST SAVE (GET – browser friendly)
+@app.route("/testsave", methods=["GET"])
 def testsave():
     try:
         conn = connect_db()
@@ -31,20 +31,21 @@ def testsave():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-# 📩 ESP32 / Client → Send Sensor Data
-@app.post("/sensor_data")
+# 📩 ESP32 → SEND SENSOR DATA
+@app.route("/sensor_data", methods=["POST"])
 def sensor_data():
-    data = request.json
-    print("📥 Incoming Data:", data)
-
     try:
+        data = request.json
+        print("📥 Incoming Data:", data)
+
         conn = connect_db()
         cur = conn.cursor()
 
-        q = """
-        INSERT INTO sensor_live (moisture, ph, temperature, humidity, N, P, K)
-        VALUES (%s,%s,%s,%s,%s,%s,%s)
+        query = """
+            INSERT INTO sensor_live (moisture, ph, temperature, humidity, N, P, K)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
         """
+
         values = (
             data.get("moisture"),
             data.get("ph"),
@@ -55,8 +56,8 @@ def sensor_data():
             data.get("K")
         )
 
-        cur.execute(q, values)
-        cur.execute(q.replace("sensor_live", "sensor_history"), values)
+        cur.execute(query, values)
+        cur.execute(query.replace("sensor_live", "sensor_history"), values)
 
         conn.commit()
         cur.close()
@@ -65,11 +66,11 @@ def sensor_data():
         return {"status": "success", "message": "Data saved 👍"}, 201
 
     except Exception as e:
-        print("❌ ERROR:", e)
+        print("❌ ERROR in /sensor_data:", e)
         return {"status": "error", "message": str(e)}, 500
 
-# 📍 Dashboard → Get Latest Reading
-@app.get("/latest")
+# 📍 DASHBOARD → LATEST DATA
+@app.route("/latest", methods=["GET"])
 def latest():
     try:
         conn = connect_db()
@@ -79,7 +80,7 @@ def latest():
         cur.close()
         conn.close()
 
-        if row is None:
+        if not row:
             return {"message": "No data available"}, 404
 
         keys = ["id","moisture","ph","temperature","humidity","N","P","K","timestamp"]
@@ -88,23 +89,23 @@ def latest():
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500
 
-# 🤖 ML Prediction API (Your Version)
-@app.post("/predict")
+# 🤖 ML PREDICTION ROUTE (RENDER SAFE)
+@app.route("/predict", methods=["POST"])
 def predict():
     try:
         data = request.json
-        
+
         crop_res = crop_predict([
             data["N"], data["P"], data["K"],
             data["ph"], data["temperature"],
             data["humidity"], data["moisture"]
         ])
-        
+
         fert_res = fertilizer_predict([
             data["N"], data["P"], data["K"],
             data["ph"], data["moisture"]
         ])
-        
+
         yield_res = yield_predict([
             data["N"], data["P"], data["K"],
             data["temperature"], data["humidity"],
@@ -124,7 +125,7 @@ def predict():
 # 🚀 SERVER START
 if __name__ == "__main__":
     ip = socket.gethostbyname(socket.gethostname())
-    print("\n🚀 CROP ADVISOR SERVER IS LIVE!")
-    print(f"➡️ Local Access  : http://127.0.0.1:5000")
-    print(f"➡️ Network Access: http://{ip}:5000  (Use this on ESP32 / Phone / Curl)\n")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    print("\n🚀 CROP ADVISOR SERVER STARTED")
+    print(f"➡️ Local  : http://127.0.0.1:5000")
+    print(f"➡️ Network: http://{ip}:5000\n")
+    app.run(host="0.0.0.0", port=5000)
