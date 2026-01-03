@@ -1,15 +1,10 @@
+import os
 import psycopg2
 
 def connect_db():
-    try:
-        conn = psycopg2.connect(
-            host="127.0.0.1",
-            port="5433",
-            database="crop_advisor",
-            user="postgres",
-            password="tanishq@11"
-        )
-        return conn
-    except Exception as e:
-        print("❌ Database Connection Error:", e)
-        return None
+    DATABASE_URL = os.environ.get("DATABASE_URL")
+
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL not set in environment variables")
+
+    return psycopg2.connect(DATABASE_URL)
