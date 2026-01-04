@@ -18,20 +18,35 @@ import { fetchWeather } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+
+const fetchSensorData = async () => {
+  const response = await fetch(`${API_URL}/sensor/latest`);
+  if (!response.ok) throw new Error("Failed to fetch sensor data");
+  return response.json();
+};
+
 const Dashboard = () => {
-  // Mock sensor data - in real app, this would come from API/backend
+  // Fetch real sensor data from backend
+  const { data: sensorApiData } = useQuery({
+    queryKey: ["sensor"],
+    queryFn: fetchSensorData,
+    refetchInterval: 1000 * 60 // refresh every 1 minute
+  });
+
+  // Fallback to mock data if no real data
   const sensorData = {
     npk: {
-      nitrogen: 65,
-      phosphorus: 45,
-      potassium: 80,
+      nitrogen: sensorApiData?.nitrogen ?? 65,
+      phosphorus: sensorApiData?.phosphorus ?? 45,
+      potassium: sensorApiData?.potassium ?? 80,
     },
-    moisture: 55,
+    moisture: sensorApiData?.moisture ?? 55,
     tempHumidity: {
-      temperature: 28,
-      humidity: 65,
+      temperature: sensorApiData?.temperature ?? 28,
+      humidity: sensorApiData?.humidity ?? 65,
     },
-    ph: 6.5,
+    ph: sensorApiData?.ph ?? 6.5,
   };
 
   const { data: weatherApiData, isLoading, error } = useQuery({
