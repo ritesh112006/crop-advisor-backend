@@ -8,12 +8,12 @@ if not os.environ.get("OPENWEATHER_API_KEY"):
     os.environ["OPENWEATHER_API_KEY"] = "3674438b387e43d455aa09366751ac66"
 
 from weather_api import get_weather
-from db import init_sensor_table, insert_sensor_data, get_latest_sensor_data
+from db import init_sensor_table, insert_sensor_data, get_latest_sensor_data, get_sensor_history
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize sensor table on startup
+# Initialize sensor tables on startup
 init_sensor_table()
 
 # ------------------------------------
@@ -74,6 +74,16 @@ def get_sensor_latest():
             return jsonify(data), 200
         else:
             return jsonify({"error": "No sensor data available"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/sensor/history", methods=["GET"])
+def get_history():
+    """Get sensor reading history"""
+    try:
+        limit = request.args.get("limit", 100, type=int)
+        data = get_sensor_history(limit=limit)
+        return jsonify({"count": len(data), "data": data}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
