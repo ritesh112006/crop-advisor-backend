@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: crop-advisor-backend
+    env: python
+    region: oregon
+    plan: free
+    runtime:
+      pythonVersion: 3.11
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: OPENWEATHER_API_KEY
