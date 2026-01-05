@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <DHT.h>
 
 const char* WIFI_SSID = "tan11";
 const char* WIFI_PASS = "12345678";
@@ -9,6 +10,10 @@ const int USER_ID = 1;
 
 #define SOIL_MOISTURE_PIN 34
 #define PH_SENSOR_PIN 35
+#define DHT_PIN 32
+#define DHT_TYPE DHT22
+
+DHT dht(DHT_PIN, DHT_TYPE);
 
 float baseTemperature = 28.0;
 float baseHumidity = 70.0;
@@ -55,15 +60,15 @@ void readSensors() {
   float ph = 3.5 + (phRaw / 4095.0) * 4.0;
   ph = constrain(ph, 3.0, 9.0);
   
-  // Add fluctuation to temperature (±2°C)
-  float tempVariation = (random(-20, 21) / 10.0);
-  float temperature = baseTemperature + tempVariation;
-  temperature = constrain(temperature, 20.0, 35.0);
+  // Read actual temperature and humidity from DHT22
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
   
-  // Add fluctuation to humidity (±5%)
-  int humidityVariation = random(-5, 6);
-  float humidity = baseHumidity + humidityVariation;
-  humidity = constrain(humidity, 40.0, 90.0);
+  // Handle DHT22 read errors
+  if (isnan(temperature) || isnan(humidity)) {
+    temperature = 25.0;  // Fallback values
+    humidity = 60.0;
+  }
   
   // Add fluctuation to NPK (±8 for each nutrient)
   int nitrogen = baseNitrogen + random(-8, 9);
@@ -124,6 +129,8 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   Serial.println("ESP32 Starting...");
+  dht.begin();
+  Serial.println("DHT22 Initialized");
   connectWiFi();
 }
 
