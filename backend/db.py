@@ -156,6 +156,36 @@ def get_user_by_email(email):
         print(f"❌ Error fetching user: {e}")
         return None
 
+def get_user_by_id(user_id):
+    """Get user details by user ID"""
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, email, full_name, location, latitude, longitude, crop_type
+            FROM users WHERE id = %s
+        """, (user_id,))
+        
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if result:
+            return {
+                "id": result[0],
+                "email": result[1],
+                "full_name": result[2],
+                "location": result[3],
+                "latitude": result[4],
+                "longitude": result[5],
+                "crop_type": result[6]
+            }
+        return None
+    except Exception as e:
+        print(f"❌ Error fetching user: {e}")
+        return None
+
 # ======================== SENSOR DATA FUNCTIONS ========================
 
 def insert_sensor_data(user_id, temperature, humidity, nitrogen, phosphorus, potassium, moisture, ph):

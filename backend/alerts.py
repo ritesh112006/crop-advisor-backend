@@ -1,9 +1,15 @@
 """Alert generation logic based on sensor data"""
-from db import create_alert
+from db import create_alert, get_user_by_id
+from maileroo import send_alert_email
 
 def check_sensor_health(user_id, sensor_data):
-    """Generate alerts based on sensor readings"""
+    """Generate alerts based on sensor readings and send emails"""
     alerts = []
+    
+    # Get user email for sending alerts
+    user = get_user_by_id(user_id)
+    user_email = user.get("email") if user else None
+    user_name = user.get("full_name", "User") if user else "User"
     
     moisture = sensor_data.get("moisture", 0)
     ph = sensor_data.get("ph", 0)
@@ -17,56 +23,78 @@ def check_sensor_health(user_id, sensor_data):
     if moisture < 30:
         message = f"⚠️ Soil moisture is low ({moisture}%). Your crops need watering soon."
         create_alert(user_id, "watering", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Low Soil Moisture Alert", f"Hi {user_name},\n\n{message}\n\nPlease water your crops soon.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     elif moisture > 80:
         message = f"⚠️ Soil moisture is too high ({moisture}%). Check for drainage issues."
         create_alert(user_id, "watering", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "High Soil Moisture Alert", f"Hi {user_name},\n\n{message}\n\nCheck your irrigation and drainage systems.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     # pH checks
     if ph < 5.5:
         message = f"⚠️ Soil pH is too acidic ({ph}). Add lime to increase pH."
         create_alert(user_id, "fertilizing", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Acidic Soil pH Alert", f"Hi {user_name},\n\n{message}\n\nConsider adding lime to your soil.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     elif ph > 8.0:
         message = f"⚠️ Soil pH is too alkaline ({ph}). Add sulfur to decrease pH."
         create_alert(user_id, "fertilizing", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Alkaline Soil pH Alert", f"Hi {user_name},\n\n{message}\n\nConsider adding sulfur to your soil.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     # NPK checks
     if nitrogen < 30:
         message = "⚠️ Nitrogen levels are low. Apply nitrogen fertilizer."
         create_alert(user_id, "fertilizing", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Low Nitrogen Levels Alert", f"Hi {user_name},\n\n{message}\n\nApply nitrogen fertilizer to improve crop health.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     if phosphorus < 20:
         message = "⚠️ Phosphorus levels are low. Apply phosphate fertilizer."
         create_alert(user_id, "fertilizing", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Low Phosphorus Levels Alert", f"Hi {user_name},\n\n{message}\n\nApply phosphate fertilizer for better root development.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     if potassium < 25:
         message = "⚠️ Potassium levels are low. Apply potassium fertilizer."
         create_alert(user_id, "fertilizing", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Low Potassium Levels Alert", f"Hi {user_name},\n\n{message}\n\nApply potassium fertilizer to strengthen your crops.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     # Temperature checks
     if temperature > 35:
         message = f"⚠️ Temperature is too high ({temperature}°C). Ensure proper irrigation."
         create_alert(user_id, "temperature", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "High Temperature Alert", f"Hi {user_name},\n\n{message}\n\nIncrease irrigation to help your crops cope with high temperatures.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     elif temperature < 10:
         message = f"⚠️ Temperature is too low ({temperature}°C). Frost risk detected."
         create_alert(user_id, "temperature", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Low Temperature Alert", f"Hi {user_name},\n\n{message}\n\nTake protective measures against frost damage.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     # Humidity checks
     if humidity > 90:
         message = f"⚠️ Humidity is very high ({humidity}%). Risk of fungal diseases."
         create_alert(user_id, "disease", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "High Humidity Alert", f"Hi {user_name},\n\n{message}\n\nEnsure good ventilation and apply fungicides if needed.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     elif humidity < 30:
         message = f"⚠️ Humidity is too low ({humidity}%). Increase irrigation frequency."
         create_alert(user_id, "humidity", message, "warning")
+        if user_email:
+            send_alert_email(user_email, "Low Humidity Alert", f"Hi {user_name},\n\n{message}\n\nIncrease irrigation to maintain soil moisture.\n\nBest regards,\nCrop Advisor Team")
         alerts.append(message)
     
     return alerts

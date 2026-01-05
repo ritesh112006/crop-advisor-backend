@@ -253,7 +253,7 @@ def get_alerts():
 @app.route("/ai/chat", methods=["POST"])
 @token_required
 def chat():
-    """Chat with Gemini AI"""
+    """Chat with Gemini AI - Enhanced with sensor data, weather, and crop context"""
     try:
         data = request.json
         query = data.get("message")
@@ -265,7 +265,39 @@ def chat():
         user = get_user_by_email(request.email)
         sensor_data = get_latest_sensor_data(request.user_id)
         
-        # Get advice from Gemini
+        # Get weather data for user's location
+        weather_data = None
+        if user and user.get("location"):
+            try:
+                weather_data = get_weather(user.get("location"))
+            except:
+                weather_data = None
+        
+        # Build enhanced context
+        context = f"Crop Type: {user.get('crop_type') if user else 'Unknown'}\n"
+        
+        if sensor_data:
+            context += f"""
+Recent Sensor Data:
+- Soil Moisture: {sensor_data.get('moisture', 'N/A')}%
+- pH Level: {sensor_data.get('ph', 'N/A')}
+- Temperature: {sensor_data.get('temperature', 'N/A')}°C
+- Humidity: {sensor_data.get('humidity', 'N/A')}%
+- NPK: N={sensor_data.get('nitrogen', 'N/A')}, P={sensor_data.get('phosphorus', 'N/A')}, K={sensor_data.get('potassium', 'N/A')} ppm
+"""
+        
+        if weather_data and weather_data.get("list") and len(weather_data["list"]) > 0:
+            current_weather = weather_data["list"][0]
+            context += f"""
+Current Weather:
+- Temperature: {current_weather.get('main', {}).get('temp', 'N/A')}°C
+- Humidity: {current_weather.get('main', {}).get('humidity', 'N/A')}%
+- Condition: {current_weather.get('weather', [{}])[0].get('description', 'N/A')}
+- Wind Speed: {current_weather.get('wind', {}).get('speed', 'N/A')} m/s
+- Rainfall: {current_weather.get('rain', {}).get('3h', 0)} mm
+"""
+        
+        # Get advice from Gemini with enhanced context
         advice = get_farming_advice(
             query,
             sensor_data=sensor_data,
