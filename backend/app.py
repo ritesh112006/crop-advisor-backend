@@ -5,6 +5,10 @@ import os
 import jwt
 from functools import wraps
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+# Load .env file for local development
+load_dotenv()
 
 # Ensure API key is set
 if not os.environ.get("OPENWEATHER_API_KEY"):
@@ -253,10 +257,12 @@ def get_alerts():
 @app.route("/ai/chat", methods=["POST"])
 @token_required
 def chat():
-    """Chat with Gemini AI - Enhanced with sensor data, weather, and crop context"""
+    """Chat with AI - Enhanced with sensor data, weather, and crop context"""
     try:
         data = request.json
         query = data.get("message")
+        
+        print(f"🔵 /ai/chat endpoint called with message: {query[:50]}...")
         
         if not query:
             return jsonify({"error": "Message required"}), 400
@@ -265,12 +271,17 @@ def chat():
         user = get_user_by_email(request.email)
         sensor_data = get_latest_sensor_data(request.user_id)
         
+        print(f"✅ User: {user.get('email') if user else 'None'}")
+        print(f"✅ Sensor data available: {sensor_data is not None}")
+        
         # Get weather data for user's location
         weather_data = None
         if user and user.get("location"):
             try:
                 weather_data = get_weather(user.get("location"))
-            except:
+                print(f"✅ Weather data fetched for {user.get('location')}")
+            except Exception as we:
+                print(f"⚠️ Could not fetch weather: {we}")
                 weather_data = None
         
         # Build enhanced context
@@ -297,13 +308,17 @@ Current Weather:
 - Rainfall: {current_weather.get('rain', {}).get('3h', 0)} mm
 """
         
-        # Get advice from Gemini with enhanced context
+        print(f"🟡 Calling get_farming_advice()...")
+        # Get advice from AI with enhanced context
         advice = get_farming_advice(
             query,
             sensor_data=sensor_data,
             crop_type=user.get("crop_type") if user else None,
             weather_data=None  # Weather data formatting is complex, simplified for now
         )
+        
+        print(f"✅ Got response from AI: {advice[:100]}...")
+        return jsonify({"response": advice}), 200
         
         return jsonify({"response": advice}), 200
     except Exception as e:

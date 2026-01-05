@@ -14,7 +14,21 @@ interface Message {
   image?: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://crop-advisor-backend-1.onrender.com";
+const botResponses: Record<string, Record<string, string>> = {
+  en: {
+    crop: "Based on your current soil analysis:\n\n🌾 **Top Recommendations:**\n1. **Wheat** - 95% match with your soil\n2. **Rice** - Good for your moisture levels\n3. **Maize** - Suitable NPK balance\n\n💡 **Tip:** With your pH of 6.5 and good moisture, wheat would give the best yield this season.",
+    irrigate: "Based on your moisture sensor (55%):\n\n💧 **Current Status:** Good but decreasing\n⏰ **Recommendation:** Irrigate within 24-48 hours\n🌅 **Best Time:** Early morning (5-7 AM)\n\n💡 **Tip:** Morning irrigation reduces evaporation by 30%!",
+    weather: "🌤️ **Weather Forecast (Next 7 Days):**\n\n• Mon-Tue: Sunny, 32-34°C\n• Wed-Thu: Partly cloudy, 28-30°C\n• Fri-Sat: Light rain expected\n• Sun: Clear skies, 31°C\n\n⚠️ **Advisory:** Complete any spraying before Wednesday.",
+    fertilizer: "Based on your NPK levels (N:65, P:45, K:80):\n\n🌿 **Nitrogen:** Slightly low - Apply 20kg urea/acre\n🟠 **Phosphorus:** Good levels\n🔴 **Potassium:** Excellent\n\n💡 **Organic Option:** Vermicompost + neem cake",
+    image: "📷 **Image Analysis:**\n\nI've analyzed your crop image. Here's what I found:\n\n🔍 **Observation:** The leaves appear healthy with good coloration.\n✅ **Status:** No visible signs of disease or pest damage.\n💡 **Recommendation:** Continue current care routine. Monitor for any changes.",
+    default: "I understand your question. Based on your current farm data:\n\n• **Soil Health:** Good condition\n• **Moisture:** 55% (optimal)\n• **Temperature:** 28°C (suitable)\n\nCould you tell me more specifically what you'd like to know?",
+  },
+  hi: {
+    crop: "आपके मिट्टी विश्लेषण के अनुसार:\n\n🌾 **सर्वोत्तम फसलें:**\n1. **गेहूं** - 95% उपयुक्त\n2. **धान** - नमी के लिए अच्छा\n3. **मक्का** - NPK संतुलन उचित",
+    image: "📷 **छवि विश्लेषण:**\n\nमैंने आपकी फसल की छवि का विश्लेषण किया है:\n\n🔍 **अवलोकन:** पत्तियां स्वस्थ दिखती हैं।\n✅ **स्थिति:** कोई बीमारी नहीं दिखती।\n💡 **सुझाव:** वर्तमान देखभाल जारी रखें।",
+    default: "मैं आपका प्रश्न समझ गया। आपके खेत के डेटा के अनुसार सहायता कर सकता हूं।",
+  },
+};
 
 const Chatbot = () => {
   const { language, t } = useLanguage();
@@ -24,8 +38,8 @@ const Chatbot = () => {
     id: 1,
     type: "bot",
     content: selectedCrop 
-      ? `Namaste! 🌱 I see you're growing **${selectedCrop.name}** ${selectedCrop.imageEmoji}. I can help you with:\n\n• Watering schedules for ${selectedCrop.name}\n• Fertilizer recommendations\n• Pest and disease management\n• Weather-based advice\n• Custom farming questions\n\nYou can also **upload an image** of your crop and I'll analyze it for any issues!\n\nWhat would you like to know?`
-      : "Namaste! 🌱 I'm your Crop Advisor AI assistant powered by Gemini. I can help you with:\n\n• Crop recommendations based on your soil\n• Irrigation and watering schedules\n• Fertilizer suggestions\n• Weather-based farming advice\n• Custom farming questions\n\n📷 **New:** Upload crop images for AI analysis!\n\nWhat can I help you with today?",
+      ? `Namaste! 🌱 I see you're growing **${selectedCrop.name}** ${selectedCrop.imageEmoji}. I can help you with:\n\n• Watering schedules for ${selectedCrop.name}\n• Fertilizer recommendations\n• Pest and disease management\n• Weather-based advice\n\nYou can also **upload an image** of your crop and I'll analyze it for any issues!`
+      : "Namaste! 🌱 I'm your Crop Advisor AI assistant. I can help you with:\n\n• Crop recommendations based on your soil\n• Irrigation and watering schedules\n• Fertilizer suggestions\n• Weather-based farming advice\n\n📷 **New:** Upload crop images for AI analysis!",
     time: "Just now",
   });
 
@@ -44,47 +58,15 @@ const Chatbot = () => {
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(() => { scrollToBottom(); }, [messages]);
 
-  // Get Gemini AI response from backend
-  const getGeminiResponse = async (userMessage: string): Promise<string> => {
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        return "Error: You need to be logged in to use the chatbot. Please log in first.";
-      }
-
-      console.log("📤 Sending message to API:", userMessage);
-      console.log("🔑 Token:", token.substring(0, 20) + "...");
-      console.log("🌐 API URL:", `${API_BASE_URL}/ai/chat`);
-
-      const response = await fetch(`${API_BASE_URL}/ai/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ message: userMessage }),
-      });
-
-      console.log("📥 API Response Status:", response.status);
-      const data = await response.json();
-      console.log("📥 API Response Data:", data);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          return "Error: Your session expired. Please log in again.";
-        }
-        return `Error: ${data.error || "Could not get response from AI. Please try again."}`;
-      }
-
-      if (data.error) {
-        return `Error: ${data.error}`;
-      }
-
-      return data.response || "No response received. Please try again.";
-    } catch (error) {
-      console.error("❌ Error calling Gemini API:", error);
-      return `Error: ${error instanceof Error ? error.message : "Network error. Please check your connection."}`;
-    }
+  const getBotResponse = (userMessage: string, hasImage: boolean): string => {
+    if (hasImage) return botResponses[language]?.image || botResponses.en.image;
+    const msg = userMessage.toLowerCase();
+    const responses = botResponses[language] || botResponses.en;
+    if (msg.includes("crop") || msg.includes("plant")) return responses.crop || responses.default;
+    if (msg.includes("irrigat") || msg.includes("water")) return responses.irrigate || responses.default;
+    if (msg.includes("weather") || msg.includes("rain")) return responses.weather || responses.default;
+    if (msg.includes("fertiliz") || msg.includes("npk")) return responses.fertilizer || responses.default;
+    return responses.default;
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,7 +78,7 @@ const Chatbot = () => {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = (content: string) => {
     if (!content.trim() && !selectedImage) return;
     
     const userMessage: Message = { 
@@ -112,28 +94,16 @@ const Chatbot = () => {
     setSelectedImage(null);
     setIsTyping(true);
 
-    try {
-      const responseText = await getGeminiResponse(content.trim() || "Analyze this crop image for any issues.");
-      
+    setTimeout(() => {
       const botMessage: Message = { 
         id: messages.length + 2, 
         type: "bot", 
-        content: responseText, 
+        content: getBotResponse(content, hadImage), 
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, botMessage]);
-    } catch (error) {
-      console.error("Error getting response:", error);
-      const errorMessage: Message = { 
-        id: messages.length + 2, 
-        type: "bot", 
-        content: "Sorry, I encountered an error while processing your request. Please try again.", 
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setIsTyping(false);
-    }
+    }, 1500);
   };
 
   return (
@@ -166,7 +136,17 @@ const Chatbot = () => {
                 </div>
                 <div className={cn("max-w-[80%] p-4 rounded-2xl", message.type === "bot" ? "bg-muted rounded-tl-none" : "bg-primary text-primary-foreground rounded-tr-none")}>
                   {message.image && <img src={message.image} alt="Uploaded" className="max-w-full h-auto rounded-lg mb-2 max-h-48 object-cover" />}
-                  <p className="text-sm whitespace-pre-line leading-relaxed">{message.content}</p>
+                  <div className="text-sm whitespace-pre-line leading-relaxed">
+                    {message.content.split('\n').map((line, i) => (
+                      <div key={i}>
+                        {line.split(/(\*\*.*?\*\*)/).map((part, j) => 
+                          part.startsWith('**') && part.endsWith('**')
+                            ? <strong key={j}>{part.slice(2, -2)}</strong>
+                            : part
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   <div className={cn("flex items-center gap-2 mt-2", message.type === "bot" ? "text-muted-foreground" : "text-primary-foreground/70")}>
                     <span className="text-xs">{message.time}</span>
                     {message.type === "bot" && <button className="p-1 hover:bg-muted-foreground/10 rounded transition-colors"><Volume2 className="w-3 h-3" /></button>}
