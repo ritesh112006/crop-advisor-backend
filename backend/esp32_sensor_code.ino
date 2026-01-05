@@ -24,6 +24,23 @@ int nitrogen      = 40;
 int phosphorus    = 25;
 int potassium     = 30;
 
+/* --------- TIMING VARIABLES (ms) ----------- */
+unsigned long lastSensorReadTime = 0;      // Last sensor read time
+unsigned long lastUploadTime = 0;          // Last data upload time
+const unsigned long SENSOR_READ_INTERVAL = 10000;   // Read sensors every 10 seconds
+const unsigned long DATA_UPLOAD_INTERVAL = 30000;   // Upload to server every 30 seconds
+
+/* --------- LATEST SENSOR VALUES ---------- */
+struct SensorData {
+  float moisture;
+  float ph;
+  float temperature;
+  float humidity;
+  int nitrogen;
+  int phosphorus;
+  int potassium;
+} latestSensorData;
+
 /* -------------------------------------------------------- */
 
 void connectWiFi() {
@@ -47,7 +64,45 @@ void sendSensorData() {
     return;
   }
 
-  /* Read Sensors */
+  /* JSON Payload with latest sensor data */
+  StaticJsonDocument<256> json;
+  json["user_id"]     = USER_ID;
+  json["moisture"]    = latestSensorData.moisture;
+  json["ph"]          = latestSensorData.ph;
+  json["temperature"] = latestSensorData.temperature;
+  json["humidity"]    = latestSensorData.humidity;
+  json["N"]           = latestSensorData.nitrogen;
+  json["P"]           = latestSensorData.phosphorus;
+  json["K"]           = latestSensorData.potassium;
+
+  String payload;
+  serializeJson(json, payload);
+
+  Serial.println("\n📤 Uploading Data to Dashboard:");
+  Serial.println(payload);
+
+  /* HTTP POST */
+  HTTPClient http;
+  http.begin(SERVER_URL);
+  http.addHeader("Content-Type", "application/json");
+
+  int httpResponseCode = http.POST(payload);
+
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.print("✅ Upload Successful - Server Response: ");
+    Serial.println(response);
+  } else {
+    Serial.print("❌ Upload Failed - Error Code: ");
+    Serial.println(httpResponseCode);
+  }
+
+  http.end();
+}
+
+void readSensors() {
+  /* Read Sensors every 10 seconds */
+  
   int moistureRaw = analogRead(SOIL_MOISTURE_PIN);
   int phRaw       = analogRead(PH_SENSOR_PIN);
 
@@ -66,40 +121,25 @@ void sendSensorData() {
   float ph = 3.5 + (phRaw / 4095.0) * 4.0;
   ph = constrain(ph, 3.0, 9.0);
 
-  /* JSON Payload */
-  StaticJsonDocument<256> json;
-  json["user_id"]     = USER_ID;
-  json["moisture"]    = moisture;
-  json["ph"]          = ph;
-  json["temperature"] = temperature;
-  json["humidity"]    = humidity;
-  json["N"]           = nitrogen;
-  json["P"]           = phosphorus;
-  json["K"]           = potassium;
+  /* Store in latest sensor data */
+  latestSensorData.moisture = moisture;
+  latestSensorData.ph = ph;
+  latestSensorData.temperature = temperature;  // Can be from DHT22
+  latestSensorData.humidity = humidity;        // Can be from DHT22
+  latestSensorData.nitrogen = nitrogen;
+  latestSensorData.phosphorus = phosphorus;
+  latestSensorData.potassium = potassium;
 
-  String payload;
-  serializeJson(json, payload);
-
-  Serial.println("\n📤 Sending Data:");
-  Serial.println(payload);
-
-  /* HTTP POST */
-  HTTPClient http;
-  http.begin(SERVER_URL);
-  http.addHeader("Content-Type", "application/json");
-
-  int httpResponseCode = http.POST(payload);
-
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    Serial.print("✅ Server Response: ");
-    Serial.println(response);
-  } else {
-    Serial.print("❌ Error Code: ");
-    Serial.println(httpResponseCode);
-  }
-
-  http.end();
+  Serial.println("\n📊 Sensors Read (every 10s):");
+  Serial.print("  Moisture: ");
+  Serial.print(moisture);
+  Serial.println("%");
+  Serial.print("  pH: ");
+  Serial.println(ph);
+  Serial.print("  Temperature: ");
+  Serial.println(temperature);
+  Serial.print("  Humidity: ");
+  Serial.println(humidity);
 }
 
 void setup() {
@@ -110,9 +150,20 @@ void setup() {
 }
 
 void loop() {
+  unsigned long currentTime = millis();
 
-  sendSensorData();
+  /* Read sensors every 10 seconds */
+  if (currentTime - lastSensorReadTime >= SENSOR_READ_INTERVAL) {
+    lastSensorReadTime = currentTime;
+    readSensors();
+  }
 
-  // ⏱ Send data every 1 minute (60000 ms)
-  delay(60000);
+  /* Upload to server every 30 seconds */
+  if (currentTime - lastUploadTime >= DATA_UPLOAD_INTERVAL) {
+    lastUploadTime = currentTime;
+    sendSensorData();
+  }
+
+  /* Small delay to prevent CPU overload */
+  delay(100);
 }
