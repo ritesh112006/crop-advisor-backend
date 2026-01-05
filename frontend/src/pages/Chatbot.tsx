@@ -48,31 +48,106 @@ const Chatbot = () => {
   const getGeminiResponse = async (userMessage: string): Promise<string> => {
     try {
       const token = localStorage.getItem("token");
+      
+      // Debug logs
+      console.log("=== Chatbot API Call Debug ===");
+      console.log("1. Token exists:", !!token);
+      console.log("2. Token value:", token ? token.substring(0, 20) + "..." : "NOT FOUND");
+      console.log("3. API Base URL:", API_BASE_URL);
+      console.log("4. Full URL:", `${API_BASE_URL}/ai/chat`);
+      console.log("5. Message:", userMessage);
+      
       if (!token) {
-        return "Error: You need to be logged in to use the chatbot. Please log in first.";
+        const errorMsg = "Error: No authentication token found. Please log in again.";
+        console.error("❌", errorMsg);
+        return errorMsg;
       }
 
+      const requestBody = { message: userMessage };
+      console.log("6. Request body:", requestBody);
+      
+      console.log("7. Sending fetch request...");
       const response = await fetch(`${API_BASE_URL}/ai/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("8. Response received:");
+      console.log("   - Status:", response.status);
+      console.log("   - Status text:", response.statusText);
+      console.log("   - OK:", response.ok);
+      console.log("   - Content-Type:", response.headers.get("Content-Type"));
+      
       if (!response.ok) {
-        if (response.status === 401) {
-          return "Error: Your session expired. Please log in again.";
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.log("9. Error JSON:", errorData);
+        } catch (e) {
+          const errorText = await response.text();
+          console.log("9. Error text:", errorText);
+          errorData = { error: errorText };
         }
-        return "Error: Could not get response from AI. Please try again.";
+
+        if (response.status === 401) {
+          const msg = "Error: Your session expired. Please log in again.";
+          console.error("❌ Auth error:", msg);
+          return msg;
+        }
+
+        if (response.status === 400) {
+          const msg = `Bad request: ${errorData?.error || "Invalid message format"}`;
+          console.error("❌ Bad request:", msg);
+          return msg;
+        }
+
+        const msg = `Error: Server returned status ${response.status} - ${errorData?.error || response.statusText}`;
+        console.error("❌", msg);
+        return msg;
       }
 
-      const data = await response.json();
-      return data.response || "No response received. Please try again.";
+      // Parse response
+      let data;
+      try {
+        data = await response.json();
+        console.log("10. Response JSON:", data);
+      } catch (e) {
+        const msg = `Error: Invalid JSON response from server: ${(e as Error).message}`;
+        console.error("❌", msg);
+        return msg;
+      }
+      
+      if (!data.response) {
+        const msg = `Error: Empty or invalid response from AI. Response was: ${JSON.stringify(data)}`;
+        console.warn("⚠️", msg);
+        return msg;
+      }
+      
+      console.log("✅ Successfully got response:", data.response.substring(0, 100) + "...");
+      return data.response;
     } catch (error) {
-      console.error("Error calling Gemini API:", error);
-      return "Sorry, I encountered an error. Please check your connection and try again.";
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("❌ Exception caught:");
+      console.error("   - Type:", error instanceof Error ? error.constructor.name : typeof error);
+      console.error("   - Message:", errorMsg);
+      console.error("   - Full error:", error);
+      
+      // Provide more specific error messages based on common issues
+      if (errorMsg.includes("Failed to fetch")) {
+        return "Error: Network issue - Check if backend is running and CORS is configured correctly.";
+      }
+      if (errorMsg.includes("CORS")) {
+        return "Error: CORS policy blocked the request. Backend CORS settings need adjustment.";
+      }
+      if (errorMsg.includes("401")) {
+        return "Error: Authentication failed. Your token may be invalid. Please log in again.";
+      }
+      
+      return `Error: ${errorMsg}. Please check your connection and try again.`;
     }
   };
 

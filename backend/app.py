@@ -270,7 +270,8 @@ def chat():
         if user and user.get("location"):
             try:
                 weather_data = get_weather(user.get("location"))
-            except:
+            except Exception as we:
+                print(f"Warning: Could not fetch weather data: {we}")
                 weather_data = None
         
         # Build enhanced context
@@ -304,9 +305,15 @@ Current Weather:
             crop_type=user.get("crop_type") if user else None
         )
         
+        if not advice:
+            return jsonify({"error": "No response from AI"}), 500
+        
         return jsonify({"response": advice}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"❌ Error in chat endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Chat error: {str(e)}"}), 500
 
 @app.route("/ai/recommendation", methods=["GET"])
 @token_required
