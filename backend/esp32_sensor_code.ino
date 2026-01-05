@@ -10,11 +10,11 @@ const int USER_ID = 1;
 #define SOIL_MOISTURE_PIN 34
 #define PH_SENSOR_PIN 35
 
-float temperature = 28.0;
-float humidity = 70.0;
-int nitrogen = 40;
-int phosphorus = 25;
-int potassium = 30;
+float baseTemperature = 28.0;
+float baseHumidity = 70.0;
+int baseNitrogen = 40;
+int basePhosphorus = 25;
+int basePotassium = 30;
 
 unsigned long lastSensorReadTime = 0;
 unsigned long lastUploadTime = 0;
@@ -54,6 +54,27 @@ void readSensors() {
   moisture = constrain(moisture, 0, 100);
   float ph = 3.5 + (phRaw / 4095.0) * 4.0;
   ph = constrain(ph, 3.0, 9.0);
+  
+  // Add fluctuation to temperature (±2°C)
+  float tempVariation = (random(-20, 21) / 10.0);
+  float temperature = baseTemperature + tempVariation;
+  temperature = constrain(temperature, 20.0, 35.0);
+  
+  // Add fluctuation to humidity (±5%)
+  int humidityVariation = random(-5, 6);
+  float humidity = baseHumidity + humidityVariation;
+  humidity = constrain(humidity, 40.0, 90.0);
+  
+  // Add fluctuation to NPK (±8 for each nutrient)
+  int nitrogen = baseNitrogen + random(-8, 9);
+  nitrogen = constrain(nitrogen, 20, 80);
+  
+  int phosphorus = basePhosphorus + random(-8, 9);
+  phosphorus = constrain(phosphorus, 10, 50);
+  
+  int potassium = basePotassium + random(-8, 9);
+  potassium = constrain(potassium, 15, 60);
+  
   latestSensorData.moisture = moisture;
   latestSensorData.ph = ph;
   latestSensorData.temperature = temperature;
@@ -64,7 +85,17 @@ void readSensors() {
   Serial.print("Sensors: Moisture=");
   Serial.print(moisture);
   Serial.print("% pH=");
-  Serial.println(ph);
+  Serial.print(ph);
+  Serial.print(" Temp=");
+  Serial.print(temperature);
+  Serial.print("C Humidity=");
+  Serial.print(humidity);
+  Serial.print("% NPK=");
+  Serial.print(nitrogen);
+  Serial.print(",");
+  Serial.print(phosphorus);
+  Serial.print(",");
+  Serial.println(potassium);
 }
 
 void sendSensorData() {
