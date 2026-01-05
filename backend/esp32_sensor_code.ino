@@ -9,7 +9,8 @@ const char* WIFI_PASS = "12345678";
 /* ------------- BACKEND URL ------------------- */
 const char* SERVER_URL = "https://crop-advisor-backend-1.onrender.com/sensor_data";
 
-/* ----------- SENSOR PINS (CHANGE IF NEEDED) ----------- */
+/* ----------- USER ID (Get from Dashboard after login) ----------- */
+const int USER_ID = 1;  // CHANGE THIS to your user_id from dashboard
 #define SOIL_MOISTURE_PIN 34   // Analog
 #define PH_SENSOR_PIN     35   // Analog
 
@@ -50,11 +51,24 @@ void sendSensorData() {
   int moistureRaw = analogRead(SOIL_MOISTURE_PIN);
   int phRaw       = analogRead(PH_SENSOR_PIN);
 
-  float moisture = map(moistureRaw, 0, 4095, 0, 100);
-  float ph       = map(phRaw, 0, 4095, 3, 9);
+  /* Improved Moisture Calculation */
+  // Calibration values - adjust based on your sensor
+  int dryValue = 4095;    // Sensor reading when completely dry
+  int wetValue = 1000;    // Sensor reading when completely wet
+  
+  // Map analog value (0-4095) to moisture percentage (0-100%)
+  float moisture = map(moistureRaw, dryValue, wetValue, 0, 100);
+  // Constrain to 0-100% range
+  moisture = constrain(moisture, 0, 100);
+  
+  /* pH Calculation */
+  // Formula: pH = 3.5 + (1.0 * ADC/4095 * 4)
+  float ph = 3.5 + (phRaw / 4095.0) * 4.0;
+  ph = constrain(ph, 3.0, 9.0);
 
   /* JSON Payload */
   StaticJsonDocument<256> json;
+  json["user_id"]     = USER_ID;
   json["moisture"]    = moisture;
   json["ph"]          = ph;
   json["temperature"] = temperature;
