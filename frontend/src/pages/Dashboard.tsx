@@ -21,7 +21,10 @@ import { Button } from "@/components/ui/button";
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
 const fetchSensorData = async () => {
-  const response = await fetch(`${API_URL}/sensor/latest`);
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${API_URL}/sensor/latest`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
   if (!response.ok) throw new Error("Failed to fetch sensor data");
   return response.json();
 };
@@ -55,6 +58,15 @@ const Dashboard = () => {
     refetchInterval: 1000 * 60 * 5 // refresh every 5 minutes
   });
 
+  // Dynamic Crop Health Status
+  const cropHealth = sensorApiData?.health_status || "Average";
+  const healthColor = cropHealth === "Good" ? "text-leaf" : cropHealth === "Average" ? "text-accent" : "text-destructive";
+  const healthMessage = cropHealth === "Good" 
+    ? "Soil condition is suitable for crop growth" 
+    : cropHealth === "Average" 
+    ? "Monitor soil conditions regularly"
+    : "Take immediate action to improve soil health";
+
   const weatherData = {
     current: {
       temp: weatherApiData?.temperature_c ?? 32,
@@ -70,13 +82,13 @@ const Dashboard = () => {
   };
 
   const soilStatus = {
-    overall: "Good",
-    message: "Soil condition is suitable for crop growth",
+    overall: cropHealth,
+    message: healthMessage,
     details: [
-      { label: "Moisture", status: "optimal", value: "55%" },
+      { label: "Moisture", status: sensorData.moisture > 40 && sensorData.moisture < 60 ? "optimal" : "warning", value: `${sensorData.moisture.toFixed(1)}%` },
       { label: "NPK Balance", status: "good", value: "Normal" },
-      { label: "pH Level", status: "optimal", value: "6.5" },
-      { label: "Temperature", status: "good", value: "28°C" },
+      { label: "pH Level", status: sensorData.ph > 6 && sensorData.ph < 7.5 ? "optimal" : "warning", value: sensorData.ph.toFixed(1) },
+      { label: "Temperature", status: sensorData.tempHumidity.temperature > 20 && sensorData.tempHumidity.temperature < 30 ? "good" : "warning", value: `${sensorData.tempHumidity.temperature}°C` },
     ],
   };
 
