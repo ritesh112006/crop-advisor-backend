@@ -47,13 +47,7 @@ Please provide:
 4. Best practices for the current conditions"""
         
         response = model.generate_content(prompt)
-        if response and response.text:
-            return response.text
-        else:
-            return "I received an empty response. Please try your question again."
-    except Exception as e:
-        print(f"❌ Error getting Gemini response: {e}")
-        return f"Sorry, I encountered an error: {str(e)}. Please try again later."
+        return response.text
     except Exception as e:
         print(f"❌ Error getting Gemini response: {e}")
         return "Sorry, I couldn't get advice at the moment. Please try again later."
