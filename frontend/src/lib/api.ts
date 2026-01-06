@@ -1,4 +1,6 @@
-export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+// Use relative /api path for local dev (works with Vite proxy)
+// For Render production, set VITE_API_URL environment variable
+export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export async function fetchWeather(city = "Pune") {
   const res = await fetch(`${API_URL}/weather?city=${encodeURIComponent(city)}`);

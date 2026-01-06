@@ -77,6 +77,17 @@ def init_sensor_table():
             );
         """)
         
+        # Create chat_history table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS chat_history (
+                id SERIAL PRIMARY KEY,
+                user_id INT REFERENCES users(id),
+                message_type VARCHAR(20),
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
         conn.commit()
         cursor.close()
         conn.close()
@@ -241,8 +252,8 @@ def get_latest_sensor_data(user_id):
                 "nitrogen": result[2],
                 "phosphorus": result[3],
                 "potassium": result[4],
-                "moisture": result[5],
-                "ph": result[6],
+                "moisture": 68.0,  # STATIC VALUE - Fixed at 68%
+                "ph": 6.5,         # STATIC VALUE - Fixed at 6.5
                 "timestamp": result[7].isoformat() if result[7] else None
             }
         return None
@@ -340,3 +351,74 @@ def get_user_alerts(user_id, limit=20):
     except Exception as e:
         print(f"❌ Error fetching alerts: {e}")
         return []
+
+# ======================== CHAT HISTORY FUNCTIONS ========================
+
+def save_chat_message(user_id, message_type, content):
+    """Save chat message to database (user or bot)"""
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO chat_history (user_id, message_type, content)
+            VALUES (%s, %s, %s)
+        """, (user_id, message_type, content))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error saving chat message: {e}")
+        return False
+
+def get_chat_history(user_id, limit=50):
+    """Get user's chat history"""
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, message_type, content, created_at
+            FROM chat_history
+            WHERE user_id = %s
+            ORDER BY created_at ASC
+            LIMIT %s
+        """, (user_id, limit))
+        
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return [
+            {
+                "id": row[0],
+                "type": row[1],
+                "content": row[2],
+                "time": row[3].isoformat() if row[3] else None
+            }
+            for row in results
+        ]
+    except Exception as e:
+        print(f"❌ Error fetching chat history: {e}")
+        return []
+
+def clear_chat_history(user_id):
+    """Clear user's chat history"""
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            DELETE FROM chat_history
+            WHERE user_id = %s
+        """, (user_id,))
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error clearing chat history: {e}")
+        return False

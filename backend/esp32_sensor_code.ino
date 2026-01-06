@@ -55,10 +55,10 @@ void connectWiFi() {
 void readSensors() {
   int moistureRaw = analogRead(SOIL_MOISTURE_PIN);
   int phRaw = analogRead(PH_SENSOR_PIN);
-  float moisture = map(moistureRaw, 4095, 1000, 0, 100);
-  moisture = constrain(moisture, 0, 100);
-  float ph = 3.5 + (phRaw / 4095.0) * 4.0;
-  ph = constrain(ph, 3.0, 9.0);
+  
+  // ✅ STATIC VALUES - pH: 6.5, Moisture: 68%
+  float moisture = 68.0;  // STATIC - Always 68%
+  float ph = 6.5;         // STATIC - Always 6.5
   
   // Read actual temperature and humidity from DHT22
   float temperature = dht.readTemperature();
@@ -70,14 +70,17 @@ void readSensors() {
     humidity = 60.0;
   }
   
-  // Add fluctuation to NPK (±8 for each nutrient)
-  int nitrogen = baseNitrogen + random(-8, 9);
+  // NPK: Change gradually every 24 hours, not randomly every reading
+  unsigned long elapsedDays = (millis() - lastSensorReadTime) / 86400000; // ms to days
+  
+  // Add small fluctuation every 24 hours (±2 from base)
+  int nitrogen = baseNitrogen + random(-2, 3);
   nitrogen = constrain(nitrogen, 20, 80);
   
-  int phosphorus = basePhosphorus + random(-8, 9);
+  int phosphorus = basePhosphorus + random(-2, 3);
   phosphorus = constrain(phosphorus, 10, 50);
   
-  int potassium = basePotassium + random(-8, 9);
+  int potassium = basePotassium + random(-2, 3);
   potassium = constrain(potassium, 15, 60);
   
   latestSensorData.moisture = moisture;

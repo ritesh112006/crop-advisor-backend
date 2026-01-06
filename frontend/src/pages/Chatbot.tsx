@@ -14,22 +14,6 @@ interface Message {
   image?: string;
 }
 
-const botResponses: Record<string, Record<string, string>> = {
-  en: {
-    crop: "Based on your current soil analysis:\n\n🌾 **Top Recommendations:**\n1. **Wheat** - 95% match with your soil\n2. **Rice** - Good for your moisture levels\n3. **Maize** - Suitable NPK balance\n\n💡 **Tip:** With your pH of 6.5 and good moisture, wheat would give the best yield this season.",
-    irrigate: "Based on your moisture sensor (55%):\n\n💧 **Current Status:** Good but decreasing\n⏰ **Recommendation:** Irrigate within 24-48 hours\n🌅 **Best Time:** Early morning (5-7 AM)\n\n💡 **Tip:** Morning irrigation reduces evaporation by 30%!",
-    weather: "🌤️ **Weather Forecast (Next 7 Days):**\n\n• Mon-Tue: Sunny, 32-34°C\n• Wed-Thu: Partly cloudy, 28-30°C\n• Fri-Sat: Light rain expected\n• Sun: Clear skies, 31°C\n\n⚠️ **Advisory:** Complete any spraying before Wednesday.",
-    fertilizer: "Based on your NPK levels (N:65, P:45, K:80):\n\n🌿 **Nitrogen:** Slightly low - Apply 20kg urea/acre\n🟠 **Phosphorus:** Good levels\n🔴 **Potassium:** Excellent\n\n💡 **Organic Option:** Vermicompost + neem cake",
-    image: "📷 **Image Analysis:**\n\nI've analyzed your crop image. Here's what I found:\n\n🔍 **Observation:** The leaves appear healthy with good coloration.\n✅ **Status:** No visible signs of disease or pest damage.\n💡 **Recommendation:** Continue current care routine. Monitor for any changes.",
-    default: "I understand your question. Based on your current farm data:\n\n• **Soil Health:** Good condition\n• **Moisture:** 55% (optimal)\n• **Temperature:** 28°C (suitable)\n\nCould you tell me more specifically what you'd like to know?",
-  },
-  hi: {
-    crop: "आपके मिट्टी विश्लेषण के अनुसार:\n\n🌾 **सर्वोत्तम फसलें:**\n1. **गेहूं** - 95% उपयुक्त\n2. **धान** - नमी के लिए अच्छा\n3. **मक्का** - NPK संतुलन उचित",
-    image: "📷 **छवि विश्लेषण:**\n\nमैंने आपकी फसल की छवि का विश्लेषण किया है:\n\n🔍 **अवलोकन:** पत्तियां स्वस्थ दिखती हैं।\n✅ **स्थिति:** कोई बीमारी नहीं दिखती।\n💡 **सुझाव:** वर्तमान देखभाल जारी रखें।",
-    default: "मैं आपका प्रश्न समझ गया। आपके खेत के डेटा के अनुसार सहायता कर सकता हूं।",
-  },
-};
-
 const Chatbot = () => {
   const { language, t } = useLanguage();
   const { selectedCrop, sensorData } = useCrop();
@@ -38,8 +22,8 @@ const Chatbot = () => {
     id: 1,
     type: "bot",
     content: selectedCrop 
-      ? `Namaste! 🌱 I see you're growing **${selectedCrop.name}** ${selectedCrop.imageEmoji}. I can help you with:\n\n• Watering schedules for ${selectedCrop.name}\n• Fertilizer recommendations\n• Pest and disease management\n• Weather-based advice\n\nYou can also **upload an image** of your crop and I'll analyze it for any issues!`
-      : "Namaste! 🌱 I'm your Crop Advisor AI assistant. I can help you with:\n\n• Crop recommendations based on your soil\n• Irrigation and watering schedules\n• Fertilizer suggestions\n• Weather-based farming advice\n\n📷 **New:** Upload crop images for AI analysis!",
+      ? `Namaste! I see you're growing **${selectedCrop.name}** ${selectedCrop.imageEmoji}. I can help you with:\n\n• Watering schedules for ${selectedCrop.name}\n• Fertilizer recommendations\n• Pest and disease management\n• Weather-based advice\n• Real-time sensor data analysis\n\nYou can also **upload an image** of your crop and I'll analyze it for any issues!`
+      : "Namaste! I'm your Crop Advisor AI assistant, powered by Gemini AI. I can help you with:\n\n• Crop recommendations based on your soil\n• Irrigation and watering schedules\n• Fertilizer suggestions based on NPK levels\n• Weather-based farming advice\n• Real-time sensor data analysis\n\nUpload crop images for AI analysis!",
     time: "Just now",
   });
 
@@ -48,26 +32,59 @@ const Chatbot = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const languageOptions = [
+    { code: "en", name: "English" },
+    { code: "hi", name: "हिंदी" },
+    { code: "mr", name: "मराठी" },
+    { code: "ta", name: "தமிழ்" },
+    { code: "te", name: "తెలుగు" },
+    { code: "kn", name: "ಕನ್ನಡ" },
+    { code: "ml", name: "മലയാളം" },
+  ];
 
   const quickQuestions = selectedCrop 
     ? [`Best practices for ${selectedCrop.name}?`, "When should I irrigate?", "Fertilizer schedule?", "Pest control tips?"]
     : ["Which crop is best for my soil?", "When should I irrigate?", "Weather forecast?", "Fertilizer recommendation"];
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  
+  // Load chat history on component mount
+  useEffect(() => { 
+    const loadChatHistory = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
 
-  const getBotResponse = (userMessage: string, hasImage: boolean): string => {
-    if (hasImage) return botResponses[language]?.image || botResponses.en.image;
-    const msg = userMessage.toLowerCase();
-    const responses = botResponses[language] || botResponses.en;
-    if (msg.includes("crop") || msg.includes("plant")) return responses.crop || responses.default;
-    if (msg.includes("irrigat") || msg.includes("water")) return responses.irrigate || responses.default;
-    if (msg.includes("weather") || msg.includes("rain")) return responses.weather || responses.default;
-    if (msg.includes("fertiliz") || msg.includes("npk")) return responses.fertilizer || responses.default;
-    return responses.default;
-  };
+        const response = await fetch("/api/chat/history?limit=50", {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.messages && data.messages.length > 0) {
+            // Convert database messages to Message format
+            const loadedMessages = data.messages.map((msg: any, index: number) => ({
+              id: index + 2,
+              type: msg.type,
+              content: msg.content,
+              time: new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }));
+            setMessages([getInitialMessage(), ...loadedMessages]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load chat history:", error);
+      }
+    };
+
+    loadChatHistory();
+  }, []);
+  
+  useEffect(() => { scrollToBottom(); }, [messages]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,7 +95,7 @@ const Chatbot = () => {
     }
   };
 
-  const sendMessage = (content: string) => {
+  const sendMessage = async (content: string) => {
     if (!content.trim() && !selectedImage) return;
     
     const userMessage: Message = { 
@@ -94,16 +111,56 @@ const Chatbot = () => {
     setSelectedImage(null);
     setIsTyping(true);
 
-    setTimeout(() => {
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("User not authenticated. Please login first.");
+      }
+
+      // Call the backend API with the user's query
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: content.trim() || "Analyze this crop image",
+          image: hadImage ? selectedImage : undefined,
+          language: selectedLanguage
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const botResponse = data.response || "I apologize, but I couldn't generate a response. Please try again.";
+
       const botMessage: Message = { 
         id: messages.length + 2, 
         type: "bot", 
-        content: getBotResponse(content, hadImage), 
+        content: botResponse,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
       setMessages((prev) => [...prev, botMessage]);
+      
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: Message = {
+        id: messages.length + 2,
+        type: "bot",
+        content: `I encountered an error: ${error instanceof Error ? error.message : "Unknown error"}. Please try again or contact support.`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -117,12 +174,27 @@ const Chatbot = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-serif font-semibold text-foreground">{t("cropAdvisorAI")}</h1>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span className="w-2 h-2 bg-leaf rounded-full animate-pulse" />
-                  {t("onlineMultilingual")}
-                  {selectedCrop && <span className="text-primary">• {selectedCrop.imageEmoji} {selectedCrop.name}</span>}
-                </p>
+                {selectedCrop && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <span className="w-2 h-2 bg-leaf rounded-full animate-pulse" />
+                    <span className="text-primary">{selectedCrop.imageEmoji} {selectedCrop.name}</span>
+                  </p>
+                )}
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-muted-foreground">Language:</label>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="px-3 py-2 bg-background border border-border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {languageOptions.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

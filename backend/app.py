@@ -18,7 +18,7 @@ from weather_api import get_weather
 from db import (
     init_sensor_table, insert_sensor_data, get_latest_sensor_data, 
     get_sensor_history, get_user_by_email, register_user, login_user,
-    get_user_alerts, create_alert
+    get_user_alerts, create_alert, save_chat_message, get_chat_history, clear_chat_history
 )
 from alerts import check_sensor_health, calculate_crop_health
 from maileroo import send_alert_email, send_welcome_email
@@ -257,72 +257,48 @@ def get_alerts():
 @app.route("/ai/chat", methods=["POST"])
 @token_required
 def chat():
-    """Chat with AI - Enhanced with sensor data, weather, and crop context"""
+    """Chat with AI - Personalized with sensor data, weather, and crop context"""
     try:
         data = request.json
         query = data.get("message")
-        
-        print(f"🔵 /ai/chat endpoint called with message: {query[:50]}...")
+        language = data.get("language", "en")  # Default to English
         
         if not query:
             return jsonify({"error": "Message required"}), 400
         
-        # Get user info for context
+        # Save user message to database
+        save_chat_message(request.user_id, "user", query)
+        
+        # Get user info for personalization
         user = get_user_by_email(request.email)
         sensor_data = get_latest_sensor_data(request.user_id)
-        
-        print(f"✅ User: {user.get('email') if user else 'None'}")
-        print(f"✅ Sensor data available: {sensor_data is not None}")
         
         # Get weather data for user's location
         weather_data = None
         if user and user.get("location"):
             try:
                 weather_data = get_weather(user.get("location"))
-                print(f"✅ Weather data fetched for {user.get('location')}")
             except Exception as we:
-                print(f"⚠️ Could not fetch weather: {we}")
                 weather_data = None
         
-        # Build enhanced context
-        context = f"Crop Type: {user.get('crop_type') if user else 'Unknown'}\n"
-        
-        if sensor_data:
-            context += f"""
-Recent Sensor Data:
-- Soil Moisture: {sensor_data.get('moisture', 'N/A')}%
-- pH Level: {sensor_data.get('ph', 'N/A')}
-- Temperature: {sensor_data.get('temperature', 'N/A')}°C
-- Humidity: {sensor_data.get('humidity', 'N/A')}%
-- NPK: N={sensor_data.get('nitrogen', 'N/A')}, P={sensor_data.get('phosphorus', 'N/A')}, K={sensor_data.get('potassium', 'N/A')} ppm
-"""
-        
-        if weather_data and weather_data.get("list") and len(weather_data["list"]) > 0:
-            current_weather = weather_data["list"][0]
-            context += f"""
-Current Weather:
-- Temperature: {current_weather.get('main', {}).get('temp', 'N/A')}°C
-- Humidity: {current_weather.get('main', {}).get('humidity', 'N/A')}%
-- Condition: {current_weather.get('weather', [{}])[0].get('description', 'N/A')}
-- Wind Speed: {current_weather.get('wind', {}).get('speed', 'N/A')} m/s
-- Rainfall: {current_weather.get('rain', {}).get('3h', 0)} mm
-"""
-        
-        print(f"🟡 Calling get_farming_advice()...")
-        # Get advice from AI with enhanced context
+        # Get personalized advice from Gemini API
         advice = get_farming_advice(
             query,
             sensor_data=sensor_data,
             crop_type=user.get("crop_type") if user else None,
-            weather_data=None  # Weather data formatting is complex, simplified for now
+            weather_data=weather_data,
+            user_location=user.get("location") if user else None,
+            user_name=user.get("name") if user else None,
+            language=language
         )
         
-        print(f"✅ Got response from AI: {advice[:100]}...")
-        return jsonify({"response": advice}), 200
+        # Save bot response to database
+        save_chat_message(request.user_id, "bot", advice)
         
         return jsonify({"response": advice}), 200
+        
     except Exception as e:
-        print(f"❌ Error in /ai/chat endpoint: {e}")
+        print(f"[ERROR] Error in /ai/chat endpoint: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
@@ -334,16 +310,46 @@ def get_recommendation():
     try:
         user = get_user_by_email(request.email)
         sensor_data = get_latest_sensor_data(request.user_id)
+        language = request.args.get("language", "en")  # Get language from query params
         
         if not sensor_data:
             return jsonify({"error": "No sensor data available"}), 404
         
         recommendation = get_crop_health_recommendation(
             sensor_data,
-            user.get("crop_type") if user else "General"
+            user.get("crop_type") if user else "General",
+            user_name=user.get("name") if user else None,
+            language=language
         )
         
         return jsonify({"recommendation": recommendation}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ------------------------------------
+# CHAT HISTORY ENDPOINTS
+# ------------------------------------
+@app.route("/chat/history", methods=["GET"])
+@token_required
+def get_history_chat():
+    """Get user's chat history"""
+    try:
+        limit = request.args.get("limit", 50, type=int)
+        history = get_chat_history(request.user_id, limit=limit)
+        return jsonify({"count": len(history), "messages": history}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/chat/clear", methods=["DELETE"])
+@token_required
+def clear_history_chat():
+    """Clear user's chat history"""
+    try:
+        success = clear_chat_history(request.user_id)
+        if success:
+            return jsonify({"status": "success", "message": "Chat history cleared"}), 200
+        else:
+            return jsonify({"error": "Failed to clear chat history"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -356,3 +362,4 @@ if __name__ == "__main__":
     print(f"➡️ Local : http://127.0.0.1:5000")
     print(f"➡️ Network : http://{ip}:5000\n")
     app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+
