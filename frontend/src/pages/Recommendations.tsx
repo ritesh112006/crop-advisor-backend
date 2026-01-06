@@ -108,8 +108,34 @@ const Recommendations = () => {
     setShowResults(true);
   };
 
-  const handleSelectCrop = (crop: CropRecommendation) => {
+  const handleSelectCrop = async (crop: CropRecommendation) => {
     setSelectedCrop(crop);
+    
+    // Create a fertilizer alert in the alerts tab
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || "/api";
+      const token = localStorage.getItem("token");
+      
+      const response = await fetch(`${API_URL}/alerts/create-crop-alert`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          crop_name: crop.name,
+          fertilizer_tip: crop.fertilizerTips,
+        }),
+      });
+      
+      if (response.ok) {
+        console.log("✅ Fertilizer alert created");
+      } else {
+        console.error("Failed to create fertilizer alert");
+      }
+    } catch (error) {
+      console.error("Error creating fertilizer alert:", error);
+    }
   };
 
   const handleChangeCrop = () => {

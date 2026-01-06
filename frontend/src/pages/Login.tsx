@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { AlertCircle, Sprout, Mail, Lock } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+// Use relative /api path for local dev (works with Vite proxy)
+// For Render production, set VITE_API_URL environment variable
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const Login = () => {
   const navigate = useNavigate();

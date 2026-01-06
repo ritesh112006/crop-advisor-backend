@@ -1,12 +1,21 @@
-import { NavLink } from "react-router-dom";
-import { History, Bell, Lightbulb, MessageCircle, Leaf, LayoutDashboard, Globe } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { History, Bell, Lightbulb, MessageCircle, Leaf, LayoutDashboard, Globe, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLanguage, languages } from "@/contexts/LanguageContext";
 import { useCrop } from "@/contexts/CropContext";
+import { Button } from "@/components/ui/button";
 
 const Header = () => {
+  const navigate = useNavigate();
   const { language, setLanguage, t } = useLanguage();
   const { selectedCrop } = useCrop();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("user_name");
+    navigate("/login");
+  };
 
   const navItems = [
     { title: t("dashboard"), path: "/dashboard", icon: LayoutDashboard },
@@ -59,7 +68,7 @@ const Header = () => {
             ))}
           </nav>
 
-          {/* Language Selector */}
+          {/* Language Selector & Logout */}
           <div className="flex items-center gap-2">
             <Globe className="w-4 h-4 text-muted-foreground hidden sm:block" />
             <select
@@ -73,6 +82,15 @@ const Header = () => {
                 </option>
               ))}
             </select>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground hidden sm:flex"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </Button>
           </div>
 
           {/* Mobile Navigation */}
@@ -92,6 +110,14 @@ const Header = () => {
                 <item.icon className="w-5 h-5" />
               </NavLink>
             ))}
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
           </nav>
         </div>
       </div>

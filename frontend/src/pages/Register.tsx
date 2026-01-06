@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { AlertCircle, Sprout, Mail, Lock, User, MapPin, Leaf } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+// Use relative /api path for local dev (works with Vite proxy)
+// For Render production, set VITE_API_URL environment variable
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -70,12 +72,16 @@ const Register = () => {
         throw new Error(data.error || "Registration failed");
       }
 
-      // Save token
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user_id", data.user_id);
+      // Clear any existing data and redirect to login to confirm credentials
+      localStorage.removeItem("token");
+      localStorage.removeItem("user_id");
+      localStorage.removeItem("user_name");
 
-      // Navigate to dashboard
-      navigate("/dashboard");
+      // Show success and redirect to login
+      setError(""); // Clear any errors
+      
+      // Navigate to login page
+      navigate("/login");
     } catch (err) {
       setError(err.message);
     } finally {

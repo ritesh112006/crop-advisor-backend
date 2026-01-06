@@ -242,7 +242,7 @@ const History = () => {
                       <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
                       <YAxis stroke="hsl(var(--muted-foreground))" />
                       <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
-                      <Bar dataKey="humidity" fill="hsl(var(--water-blue))" radius={[4, 4, 0, 0]} name="Humidity (%)" />
+                      <Bar dataKey="rainfall" fill="hsl(var(--water-blue))" radius={[4, 4, 0, 0]} name="Rainfall (mm)" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

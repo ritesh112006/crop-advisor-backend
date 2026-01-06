@@ -1,10 +1,11 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Bell, AlertTriangle, CheckCircle, Info, X, CloudRain, ThermometerSun, Droplets, Sprout } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCrop } from "@/contexts/CropContext";
+import { API_URL } from "@/lib/api";
 
 interface Alert {
   id: number;
@@ -177,8 +178,74 @@ const Alerts = () => {
     return alerts;
   }, [sensorData, weatherData, selectedCrop]);
 
-  const [alerts, setAlerts] = useState(generateAlerts);
+  const [alerts, setAlerts] = useState<Alert[]>(generateAlerts);
   const [filter, setFilter] = useState<"all" | "unread" | "high">("all");
+  const [loading, setLoading] = useState(true);
+
+  // Fetch alerts from backend and combine with generated alerts
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const response = await fetch(`${API_URL}/alerts`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const backendAlerts = data.alerts || [];
+
+          // Convert backend alerts to Alert interface format
+          const convertedAlerts: Alert[] = backendAlerts.map((alert: any, index: number) => {
+            // Determine alert type based on alert_type
+            let type: "warning" | "danger" | "success" | "info" = "info";
+            if (alert.severity === "High") type = "danger";
+            else if (alert.severity === "Medium") type = "warning";
+            else if (alert.severity === "Low" && alert.alert_type === "success") type = "success";
+
+            // Determine icon
+            let icon: "rain" | "temp" | "moisture" | "general" | "crop" = "general";
+            if (alert.alert_type === "watering") icon = "moisture";
+            else if (alert.alert_type === "fertilizing") icon = "crop";
+            else if (alert.alert_type === "temperature") icon = "temp";
+            else if (alert.alert_type === "rainfall") icon = "rain";
+
+            return {
+              id: alert.id || index,
+              type: type,
+              severity: alert.severity || "Low",
+              title: alert.message?.split(":")?.at(0) || "Alert",
+              message: alert.message || "",
+              action: "",
+              time: new Date(alert.created_at).toLocaleDateString(),
+              read: alert.is_read || false,
+              icon: icon,
+            };
+          });
+
+          // Combine backend alerts with generated sensor alerts
+          const combinedAlerts = [...convertedAlerts, ...generateAlerts];
+          
+          // Remove duplicates based on message
+          const uniqueAlerts = Array.from(
+            new Map(combinedAlerts.map(alert => [alert.message, alert])).values()
+          );
+
+          setAlerts(uniqueAlerts);
+        }
+      } catch (error) {
+        console.error("Error fetching alerts:", error);
+        // Fall back to generated alerts
+        setAlerts(generateAlerts);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAlerts();
+  }, [generateAlerts]);
 
   const dismissAlert = (id: number) => {
     setAlerts(alerts.filter((alert) => alert.id !== id));
@@ -279,7 +346,7 @@ const Alerts = () => {
                     {!alert.read && <span className="px-2 py-1 bg-primary text-primary-foreground text-xs rounded-full font-medium">New</span>}
                   </div>
                   <h3 className="font-semibold text-foreground text-lg">{alert.title}</h3>
-                  <p className="text-muted-foreground mt-1">{alert.message}</p>
+                  <div className="text-muted-foreground mt-1 whitespace-pre-wrap">{alert.message}</div>
                   <div className="mt-4 p-3 rounded-xl bg-card/50 border border-border">
                     <p className="text-sm font-medium text-foreground flex items-center gap-2"><span className="text-primary">👉</span>{t("suggestedAction")}:</p>
                     <p className="text-sm text-muted-foreground mt-1">{alert.action}</p>
